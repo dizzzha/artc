@@ -1,0 +1,197 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Словарь</title>
+    <meta name="viewport" content="width=device-width, user-scalable=no">
+    <link rel="stylesheet" href="https://code.jquery.com/ui/1.12.1/themes/base/jquery-ui.css">
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+    <script src="https://code.jquery.com/ui/1.12.1/jquery-ui.min.js"></script>
+</head>
+<style>
+    @font-face {
+        font-family: "ProText";
+        font-style: normal;
+        font-weight: 700;
+        src: local("SFProText-Bold"),
+            url("SFProText-Bold.woff") format("woff"),
+            url("SFProText-Bold.otf") format("otf");
+    }
+    body {
+        font-family: Roboto, bold;
+    }
+
+    .parent_div {
+        width: 100%;
+        height: 100%;
+        position: fixed;
+        top: 0;
+        left: 0;
+        display: flex;
+        align-items: center;
+        align-content: center;
+        justify-content: center;
+        overflow: auto
+    }
+
+    .children_div {
+        width: 100%;
+        max-height: 100vh;
+        display: flex;
+        align-items: center;
+        justify-content: flex-start;
+        flex-direction: column;
+        overflow-y: auto;
+        padding: 20px 0;
+    }
+
+    p {
+        font-size: 3vw;
+        margin: 0 0 50px 0
+    }
+
+    input {
+        display: block;
+        width: 50vw;
+        margin-top: 0.5rem;
+        padding: 0 1.25rem;
+    }
+
+    input,
+    input::placeholder {
+        font: 1.25rem/3 sans-serif;
+    }
+
+    button {
+        display: block;
+        width: 50vw;
+        height: 4vh;
+    }
+
+    textarea {
+        display: block;
+        width: 50vw;
+        padding: 0 1.25rem;
+    }
+
+    textarea,
+    textarea::placeholder {
+        font: 1.25rem/3 sans-serif;
+    }
+
+    #submit {
+        margin: 10px 0 20px 0;
+        background-color: #0076F7;
+        color: #fff;
+        border-radius: 25px;
+        padding: 5px;
+        border: none;
+        cursor: pointer;
+        font-family: Roboto, bold;
+    }
+    #addBtn {
+        background-color: #0076F7;
+        color: #fff;
+        border-radius: 25px;
+        border: none;
+        cursor: pointer;
+        font-family: Roboto, bold;
+        margin-top: 10px;
+        padding: 2vh !important;
+        width: 50vw !important;
+        font: inherit !important;
+    }
+    @media (max-width: 768px) {
+        .children_div {
+            justify-content: flex-start;
+            padding-top: 20px;
+        }
+
+        p {
+            font-size: 5vw;
+            margin: 0 0 20px 0;
+        }
+
+        input, button, textarea {
+            width: 80vw;
+        }
+    }
+</style>
+<body>
+    <div class="parent_div">
+        <div class="children_div">
+            <button id="submit">Результат</button>
+            <p>Введите артикул в поле ниже:</p>
+            <div id="nativelangdrop">
+                <input type="text" id="input" placeholder="Артикул" class="input">
+            </div>
+            <span id="additional"></span>
+            <input id="addBtn" type="button" value="Добавить поле артикула" />
+            <br>
+            <textarea id="output" rows="4" cols="30" readonly></textarea>
+            <br>
+        </div>
+    <script>
+        $(document).ready(function() {
+            // Функция для применения автозаполнения к элементу
+            function applyAutocomplete(element) {
+                $.getJSON('/get_keys/', function(data) {
+                    $(element).autocomplete({
+                        source: data.keys,
+                        minLength: 1
+                    });
+                });
+            }
+
+            // Применяем автозаполнение к исходному input
+            applyAutocomplete('#input');
+
+            $('#submit').click(function() {
+                var keys = [];
+                
+                // Собираем значения из всех input-полей
+                $('.input').each(function() {
+                    var key = $(this).val().trim();
+                    if (key) {
+                        keys.push(key);
+                    }
+                });
+                
+                if (keys.length > 0) {
+                    $.ajax({
+                        url: '/get_value/',
+                        method: 'POST',
+                        data: {
+                            'keys': JSON.stringify(keys),
+                            'csrfmiddlewaretoken': '{{ csrf_token }}'
+                        },
+                        success: function(response) {
+                            var output = '';
+                            for (var i = 0; i < keys.length; i++) {
+                                output += keys[i] + ': ' + response.values[i] + '\n';
+                            }
+                            $('#output').val(output);
+                        }
+                    });
+                } else {
+                    $('#output').val('Пожалуйста, введите хотя бы один артикул.');
+                }
+            });
+
+            var total = 6;
+            $("#addBtn").on("click", function() {
+                var ctr = $("#additional").find(".extra").length;
+                if (ctr < total) {
+                    var $ddl = $("#nativelangdrop").clone();
+                    $ddl.attr("id", "ddl" + ctr);
+                    $ddl.addClass("extra");
+                    $ddl.find('input').addClass('input');  // Добавляем класс 'input'
+                    $("#additional").append($ddl);
+                    
+                    // Применяем автозаполнение к новому input
+                    applyAutocomplete($ddl.find('input'));
+                }
+            });
+        });
+    </script>
+</body>
+</html>
