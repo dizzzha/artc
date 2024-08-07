@@ -8,14 +8,6 @@
     <script src="https://code.jquery.com/ui/1.12.1/jquery-ui.min.js"></script>
 </head>
 <style>
-    @font-face {
-        font-family: "ProText";
-        font-style: normal;
-        font-weight: 700;
-        src: local("SFProText-Bold"),
-            url("SFProText-Bold.woff") format("woff"),
-            url("SFProText-Bold.otf") format("otf");
-    }
     body {
         font-family: Roboto, bold;
     }
@@ -44,21 +36,48 @@
         padding: 20px 0;
     }
 
+    .removeBtn {
+        position: absolute;
+        right: 10px;
+        top: 50%;
+        transform: translateY(-50%);
+        background-color: #ff4444;
+        color: #fff;
+        border: none;
+        border-radius: 50%;
+        width: 20px;
+        height: 20px;
+        font-size: 14px;
+        line-height: 1;
+        padding: 0;
+        cursor: pointer;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+    }
+
+    .input-container {
+        display: flex;
+        align-items: center;
+        margin-bottom: 10px;
+        position: relative;
+        width: 50vw;
+    }
+
     p {
         font-size: 3vw;
         margin: 0 0 50px 0
     }
 
-    input {
-        display: block;
-        width: 50vw;
-        margin-top: 0.5rem;
-        padding: 0 1.25rem;
+    .input {
+        width: 100%;
+        padding-right: 30px; /* Место для кнопки удаления */
     }
 
     input,
     input::placeholder {
         font: 1.25rem/3 sans-serif;
+        padding: 0 10px 0 10px;
     }
 
     button {
@@ -114,18 +133,20 @@
         input, button, textarea {
             width: 80vw;
         }
+        .input-container {
+            width: 80vw;
+        }
     }
 </style>
 <body>
     <div class="parent_div">
         <div class="children_div">
-            <button id="submit">Результат</button>
-            <p>Введите артикул в поле ниже:</p>
-            <div id="nativelangdrop">
+            <div id="nativelangdrop" class="input-container">
                 <input type="text" id="input" placeholder="Артикул" class="input">
             </div>
             <span id="additional"></span>
             <input id="addBtn" type="button" value="Добавить поле артикула" />
+            <button id="submit">Результат</button>
             <br>
             <textarea id="output" rows="4" cols="30" readonly></textarea>
             <br>
@@ -144,6 +165,16 @@
 
             // Применяем автозаполнение к исходному input
             applyAutocomplete('#input');
+            
+            function checkFieldCount() {
+                var totalFields = $(".input-container").length;
+                if (totalFields >= total) {
+                    $("#addBtn").hide();
+                } else {
+                    $("#addBtn").show();
+                }
+            }
+
 
             $('#submit').click(function() {
                 var keys = [];
@@ -177,20 +208,31 @@
                 }
             });
 
-            var total = 6;
-            $("#addBtn").on("click", function() {
-                var ctr = $("#additional").find(".extra").length;
-                if (ctr < total) {
-                    var $ddl = $("#nativelangdrop").clone();
-                    $ddl.attr("id", "ddl" + ctr);
-                    $ddl.addClass("extra");
-                    $ddl.find('input').addClass('input');  // Добавляем класс 'input'
-                    $("#additional").append($ddl);
+            var total = 4;
+                $("#addBtn").on("click", function() {
+                    var totalFields = $(".input-container").length;
+                    if (totalFields < total) {
+                        var $ddl = $('<div class="input-container extra"></div>');
+                        var $input = $('<input type="text" placeholder="Артикул" class="input">');
+                        var $removeBtn = $('<button class="removeBtn">X</button>');
+                        
+                        $ddl.append($input).append($removeBtn);
+                        $("#additional").append($ddl);
+                        
+                        applyAutocomplete($input);
+                    }
                     
-                    // Применяем автозаполнение к новому input
-                    applyAutocomplete($ddl.find('input'));
-                }
-            });
+                    checkFieldCount();
+                });
+
+                // Обработчик для удаления полей
+                $(document).on('click', '.removeBtn', function() {
+                    $(this).closest('.input-container').remove();
+                    checkFieldCount();
+                });
+
+                // Вызываем функцию при загрузке
+                checkFieldCount();
         });
     </script>
 </body>
