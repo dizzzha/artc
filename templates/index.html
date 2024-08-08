@@ -86,15 +86,16 @@
         height: 4vh;
     }
 
-    textarea {
+    #output {
         display: block;
         width: 50vw;
         padding: 0 1.25rem;
-    }
-
-    textarea,
-    textarea::placeholder {
+        border: 1px solid #ccc;
+        min-height: 100px;
         font: 1.25rem/3 sans-serif;
+        white-space: pre-wrap;
+        word-wrap: break-word;
+        overflow-wrap: break-word;
     }
 
     #submit {
@@ -130,7 +131,7 @@
             margin: 0 0 20px 0;
         }
 
-        input, button, textarea {
+        input, button, #output {
             width: 80vw;
         }
         .input-container {
@@ -148,7 +149,7 @@
             <input id="addBtn" type="button" value="Добавить поле артикула" />
             <button id="submit">Результат</button>
             <br>
-            <textarea id="output" rows="4" cols="30" readonly></textarea>
+            <div id="output" contenteditable="true" style="color: blue;"></div>
             <br>
         </div>
     <script>
@@ -166,6 +167,7 @@
             // Применяем автозаполнение к исходному input
             applyAutocomplete('#input');
             
+        
             function checkFieldCount() {
                 var totalFields = $(".input-container").length;
                 if (totalFields >= total) {
@@ -198,13 +200,13 @@
                         success: function(response) {
                             var output = '';
                             for (var i = 0; i < keys.length; i++) {
-                                output += keys[i] + ': ' + response.values[i] + '\n';
+                                output += '<span style="color:green;">' + keys[i] + '</span>: <span style="color:blue;">' + response.values[i] + '</span>\n';
                             }
-                            $('#output').val(output);
+                            $('#output').html(output);
                         }
                     });
                 } else {
-                    $('#output').val('Пожалуйста, введите хотя бы один артикул.');
+                    $('#output').html('Пожалуйста, введите хотя бы один артикул.');
                 }
             });
 
