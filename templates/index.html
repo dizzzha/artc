@@ -7,6 +7,7 @@
     <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
     <script src="https://code.jquery.com/ui/1.12.1/jquery-ui.min.js"></script>
 </head>
+<!--Пока, что все работает-->
 <style>
     body {
         font-family: Roboto, bold;
@@ -35,25 +36,44 @@
         overflow-y: auto;
         padding: 20px 0;
     }
+    #dynamicInputs {
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        flex-direction: column;
+    }
+
+    .input-wrapper {
+        position: relative;
+        width: 100%;
+    }
+
+    .searchInput {
+        width: 100%;
+        padding-right: 30px; /* Место для кнопки удаления */
+        box-sizing: border-box;
+    }
 
     .removeBtn {
         position: absolute;
-        right: 10px;
+        right: 15px;
         top: 50%;
         transform: translateY(-50%);
-        background-color: #ff4444;
-        color: #fff;
+        background-color: transparent;
+        color: #ff4444;
         border: none;
-        border-radius: 50%;
+        font-size: 40px;
+        cursor: pointer;
+        padding: 0;
         width: 20px;
         height: 20px;
-        font-size: 14px;
-        line-height: 1;
-        padding: 0;
-        cursor: pointer;
         display: flex;
         align-items: center;
         justify-content: center;
+    }
+
+    .removeBtn:hover {
+        color: #ff0000;
     }
 
     .input-container {
@@ -62,6 +82,10 @@
         margin-bottom: 10px;
         position: relative;
         width: 50vw;
+    }
+
+    .input-container:empty {
+        display: none;
     }
 
     p {
@@ -83,7 +107,6 @@
     button {
         display: block;
         width: 50vw;
-        height: 4vh;
     }
 
     #output {
@@ -103,7 +126,7 @@
         background-color: #0076F7;
         color: #fff;
         border-radius: 25px;
-        padding: 5px;
+        padding: 15px;
         border: none;
         cursor: pointer;
         font-family: Roboto, bold;
@@ -119,6 +142,33 @@
         padding: 2vh !important;
         width: 50vw !important;
         font: inherit !important;
+    }
+    .autocomplete-items {
+        position: absolute;
+        border: 1px solid #d4d4d4;
+        border-bottom: none;
+        border-top: none;
+        z-index: 99;
+        top: 100%;
+        left: 0;
+        right: 0;
+    }
+    .autocomplete-items div {
+        padding: 10px;
+        cursor: pointer;
+        background-color: #fff;
+        border-bottom: 1px solid #d4d4d4;
+    }
+    .autocomplete-items div:hover {
+        background-color: #e9e9e9;
+    }
+    .autocomplete-active {
+        background-color: DodgerBlue !important;
+        color: #ffffff;
+    }
+    .autocomplete {
+        position: relative;
+        display: inline-block;
     }
     @media (max-width: 768px) {
         .children_div {
@@ -137,105 +187,205 @@
         .input-container {
             width: 80vw;
         }
+        #addBtn {
+            width: 80vw!important;
+        }
     }
 </style>
 <body>
     <div class="parent_div">
         <div class="children_div">
-            <div id="nativelangdrop" class="input-container">
-                <input type="text" id="input" placeholder="Артикул" class="input">
+            <h2>Поиск по словарю</h2>
+            <div id="dynamicInputs">
+                <div class="input-container autocomplete">
+                    <div class="input-wrapper">
+                        <input type="text" class="searchInput" placeholder="Введите запрос">
+                        <button class="removeBtn" onclick="removeInput(this)">×</button>
+                    </div>
+                </div>
             </div>
-            <span id="additional"></span>
-            <input id="addBtn" type="button" value="Добавить поле артикула" />
-            <button id="submit">Результат</button>
-            <br>
+            <button id="addBtn" onclick="addInput()">Добавить поле</button>
+            <button id="submit" onclick="performSearch()">Поиск</button>
+            <div id="additional"></div>
+            <h3>Результат</h3>
             <div id="output" contenteditable="true" style="color: blue;"></div>
-            <br>
         </div>
+    </div>
     <script>
-        $(document).ready(function() {
-            // Функция для применения автозаполнения к элементу
-            function applyAutocomplete(element) {
-                $.getJSON('/get_keys/', function(data) {
-                    $(element).autocomplete({
-                        source: data.keys,
-                        minLength: 1
-                    });
+        let allKeys = [];
+        let allValues = [];
+        let inputCount = 1;
+        let allItems = [];
+
+        function updateAutocomplete() {
+            fetch('/get_keys/')
+                .then(response => response.json())
+                .then(data => {
+                    const keys = data.keys;
+                    fetch('/get_values/')
+                        .then(response => response.json())
+                        .then(data => {
+                            const values = data.values;
+                            allItems = [...new Set([...keys, ...values])];
+                            const inputs = document.getElementsByClassName('searchInput');
+                            Array.from(inputs).forEach(input => {
+                                setupAutocomplete(input);
+                            });
+                        });
                 });
-            }
+        }
 
-            // Применяем автозаполнение к исходному input
-            applyAutocomplete('#input');
-            
-        
-            function checkFieldCount() {
-                var totalFields = $(".input-container").length;
-                if (totalFields >= total) {
-                    $("#addBtn").hide();
-                } else {
-                    $("#addBtn").show();
-                }
-            }
-
-
-            $('#submit').click(function() {
-                var keys = [];
-                
-                // Собираем значения из всех input-полей
-                $('.input').each(function() {
-                    var key = $(this).val().trim();
-                    if (key) {
-                        keys.push(key);
+        function setupAutocomplete(inp) {
+            let currentFocus;
+            inp.addEventListener("input", function(e) {
+                let a, b, i, val = this.value;
+                closeAllLists();
+                if (!val) { return false; }
+                currentFocus = -1;
+                a = document.createElement("DIV");
+                a.setAttribute("id", this.id + "autocomplete-list");
+                a.setAttribute("class", "autocomplete-items");
+                this.parentNode.appendChild(a);
+                for (i = 0; i < allItems.length; i++) {
+                    if (allItems[i].toLowerCase().indexOf(val.toLowerCase()) > -1) {
+                        b = document.createElement("DIV");
+                        b.innerHTML = allItems[i].replace(new RegExp(val, "gi"), match => `<strong>${match}</strong>`);
+                        b.innerHTML += "<input type='hidden' value='" + allItems[i] + "'>";
+                        b.addEventListener("click", function(e) {
+                            inp.value = this.getElementsByTagName("input")[0].value;
+                            closeAllLists();
+                        });
+                        a.appendChild(b);
                     }
-                });
-                
-                if (keys.length > 0) {
-                    $.ajax({
-                        url: '/get_value/',
-                        method: 'POST',
-                        data: {
-                            'keys': JSON.stringify(keys),
-                            'csrfmiddlewaretoken': '{{ csrf_token }}'
-                        },
-                        success: function(response) {
-                            var output = '';
-                            for (var i = 0; i < keys.length; i++) {
-                                output += '<span style="color:green;">' + keys[i] + '</span>: <span style="color:blue;">' + response.values[i] + '</span>\n';
-                            }
-                            $('#output').html(output);
-                        }
-                    });
-                } else {
-                    $('#output').html('Пожалуйста, введите хотя бы один артикул.');
                 }
             });
 
-            var total = 4;
-                $("#addBtn").on("click", function() {
-                    var totalFields = $(".input-container").length;
-                    if (totalFields < total) {
-                        var $ddl = $('<div class="input-container extra"></div>');
-                        var $input = $('<input type="text" placeholder="Артикул" class="input">');
-                        var $removeBtn = $('<button class="removeBtn">X</button>');
-                        
-                        $ddl.append($input).append($removeBtn);
-                        $("#additional").append($ddl);
-                        
-                        applyAutocomplete($input);
+            // Обработка выбора на мобильных устройствах
+            inp.addEventListener("focusout", function(e) {
+                // Задержка, чтобы успеть обработать клик по элементу списка
+                setTimeout(() => closeAllLists(), 200);
+            });
+            inp.addEventListener("keydown", function(e) {
+                let x = document.getElementById(this.id + "autocomplete-list");
+                if (x) x = x.getElementsByTagName("div");
+                if (e.keyCode == 40) {
+                    currentFocus++;
+                    addActive(x);
+                } else if (e.keyCode == 38) {
+                    currentFocus--;
+                    addActive(x);
+                } else if (e.keyCode == 13) {
+                    e.preventDefault();
+                    if (currentFocus > -1) {
+                        if (x) x[currentFocus].click();
                     }
-                    
-                    checkFieldCount();
-                });
+                }
+            });
+            function addActive(x) {
+                if (!x) return false;
+                removeActive(x);
+                if (currentFocus >= x.length) currentFocus = 0;
+                if (currentFocus < 0) currentFocus = (x.length - 1);
+                x[currentFocus].classList.add("autocomplete-active");
+            }
+            function removeActive(x) {
+                for (let i = 0; i < x.length; i++) {
+                    x[i].classList.remove("autocomplete-active");
+                }
+            }
+            function closeAllLists(elmnt) {
+                let x = document.getElementsByClassName("autocomplete-items");
+                for (let i = 0; i < x.length; i++) {
+                    if (elmnt != x[i] && elmnt != inp) {
+                        x[i].parentNode.removeChild(x[i]);
+                    }
+                }
+            }
+            document.addEventListener("click", function (e) {
+                closeAllLists(e.target);
+            });
+        }
 
-                // Обработчик для удаления полей
-                $(document).on('click', '.removeBtn', function() {
-                    $(this).closest('.input-container').remove();
-                    checkFieldCount();
-                });
+        function performSearch() {
+            const inputs = document.getElementsByClassName('searchInput');
+            const searchValues = Array.from(inputs).map(input => input.value).filter(value => value.trim() !== '');
 
-                // Вызываем функцию при загрузке
-                checkFieldCount();
-        });
+            fetch('/search/', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRFToken': getCookie('csrftoken')
+                },
+                body: JSON.stringify({
+                    search_values: searchValues
+                })
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.result) {
+                    document.getElementById('output').innerText = data.result;
+                } else {
+                    document.getElementById('output').innerText = 'Поиск не дал результатов';
+                }
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                document.getElementById('output').innerText = 'Произошла ошибка при поиске';
+            });
+        }
+        function addInput() {
+            if (inputCount < 4) {
+                inputCount++;
+                const newInput = document.createElement('div');
+                newInput.className = 'input-container autocomplete';
+                newInput.innerHTML = `
+                    <div class="input-wrapper">
+                        <input type="text" class="searchInput" placeholder="Введите запрос">
+                        <button class="removeBtn" onclick="removeInput(this)">×</button>
+                    </div>
+                `;
+                document.getElementById('dynamicInputs').appendChild(newInput);
+                setupAutocomplete(newInput.querySelector('.searchInput'));
+            }
+        }
+
+        function removeInput(button) {
+            if (inputCount > 1) {
+                // Находим родительский элемент .input-container
+                const inputContainer = button.closest('.input-container');
+                // Удаляем весь контейнер
+                inputContainer.remove();
+                inputCount--;
+                updateAutocomplete();
+            }
+        }
+
+        function getCookie(name) {
+            let cookieValue = null;
+            if (document.cookie && document.cookie !== '') {
+                const cookies = document.cookie.split(';');
+                for (let i = 0; i < cookies.length; i++) {
+                    const cookie = cookies[i].trim();
+                    if (cookie.substring(0, name.length + 1) === (name + '=')) {
+                        cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+                        break;
+                    }
+                }
+            }
+            return cookieValue;
+        }
+
+        window.onload = function() {
+            Promise.all([
+                fetch('/get_keys/').then(response => response.json()),
+                fetch('/get_values/').then(response => response.json())
+            ]).then(([keysData, valuesData]) => {
+                allKeys = keysData.keys;
+                allValues = valuesData.values;
+                updateAutocomplete();
+            });
+        };
+        // Пока что все работает Часть2
     </script>
 </body>
 </html>
