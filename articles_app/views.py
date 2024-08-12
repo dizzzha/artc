@@ -1,7 +1,8 @@
 from django.shortcuts import render
 from django.http import JsonResponse
+from django.views.decorators.csrf import csrf_exempt
 import json
-from .text import dictionary
+from .output_dict import dictionary
 
 
 def index(request):
@@ -22,3 +23,39 @@ def get_value(request):
 def get_keys(request):
     keys = list(dictionary.keys())
     return JsonResponse({'keys': keys})
+
+def get_values(request):
+    values = [value[1] for value in dictionary.values()]
+    return JsonResponse({'values': values})
+
+
+@csrf_exempt
+def search(request):
+    if request.method == 'POST':
+        data = json.loads(request.body)
+        search_values = data.get('search_values', [])
+
+        results = []
+        for search_value in search_values:
+            key_result = dictionary.get(search_value) or dictionary.get(search_value.upper()) or dictionary.get(
+                search_value.lower())
+
+            value_results = [
+                (key, value) for key, value in dictionary.items()
+                if search_value.lower() == value[1].lower()
+            ]
+
+            if key_result:
+                results.append(f"{key_result[0]}, {key_result[1]}")
+            elif value_results:
+                for key, value in value_results:
+                    results.append(f"{key} {value[0]}")
+            else:
+                results.append(f"Ничего не найдено для запроса: {search_value}")
+
+        return JsonResponse({'result': '\n'.join(results)})
+
+    return JsonResponse({'error': 'Метод не разрешен'}, status=405)
+
+#VALUE
+#def get_articles
