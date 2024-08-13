@@ -46,14 +46,26 @@ def search(request):
             ]
 
             if key_result:
-                results.append(f"{key_result[0]}, {key_result[1]}")
+                results.append({
+                    'key': search_value,
+                    'value1': key_result[0],
+                    'value2': key_result[1]
+                })
             elif value_results:
                 for key, value in value_results:
-                    results.append(f"{key} {value[0]}")
+                    results.append({
+                        'key': key,
+                        'value1': value[0],
+                        'value2': value[1]
+                    })
             else:
-                results.append(f"Ничего не найдено для запроса: {search_value}")
+                results.append({
+                    'key': None,
+                    'value1': None,
+                    'value2': f"Ничего не найдено для запроса: {search_value}"
+                })
 
-        return JsonResponse({'result': '\n'.join(results)})
+        return JsonResponse({'results': results})
 
     return JsonResponse({'error': 'Метод не разрешен'}, status=405)
 
