@@ -7,7 +7,6 @@
     <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
     <script src="https://code.jquery.com/ui/1.12.1/jquery-ui.min.js"></script>
 </head>
-<!--Пока, что все работает-->
 <style>
     body {
         font-family: Roboto, bold;
@@ -41,6 +40,20 @@
         justify-content: center;
         align-items: center;
         flex-direction: column;
+        position: relative;
+    }
+
+    #clearAllBtn {
+        width: 30px;
+        transform: rotate(180deg);
+        white-space: nowrap;
+        position: absolute;
+        right: -2vw;
+        top: 0;
+        background: #fff;
+        border: 1px solid #000;
+        color: #ff4444;
+        font-weight: 900;
     }
 
     .input-wrapper {
@@ -79,9 +92,9 @@
     .input-container {
         display: flex;
         align-items: center;
-        margin-bottom: 10px;
         position: relative;
         width: 50vw;
+        margin-bottom: 10px;
     }
 
     .input-container:empty {
@@ -115,8 +128,6 @@
         padding: 0 1.25rem;
         border: 1px solid #ccc;
         min-height: 100px;
-        font: 1.25rem/3 sans-serif;
-        white-space: pre-wrap;
         word-wrap: break-word;
         overflow-wrap: break-word;
     }
@@ -190,6 +201,9 @@
         #addBtn {
             width: 80vw!important;
         }
+        #clearAllBtn {
+            right: -9vw;
+        }
     }
 </style>
 <body>
@@ -199,12 +213,14 @@
             <div id="dynamicInputs">
                 <div class="input-container autocomplete">
                     <div class="input-wrapper">
-                        <input type="text" class="searchInput" placeholder="Введите запрос">
-                        <button class="removeBtn" onclick="removeInput(this)">×</button>
+                        <input type="text" id="firstInput" class="searchInput" placeholder="Введите запрос">
+                        <button id="firstRemoveBtn" class="removeBtn" onclick="handleFirstRemove()">×</button>
                     </div>
                 </div>
+                <!-- Новые input'ы будут добавляться здесь -->
+                <button id="addBtn" onclick="addInput()">Добавить поле</button>
+                <button id="clearAllBtn" onclick="clearAllInputs()">X</button>
             </div>
-            <button id="addBtn" onclick="addInput()">Добавить поле</button>
             <button id="submit" onclick="performSearch()">Поиск</button>
             <div id="additional"></div>
             <h3>Результат</h3>
@@ -322,17 +338,33 @@
             })
             .then(response => response.json())
             .then(data => {
-                if (data.result) {
-                    document.getElementById('output').innerText = data.result;
+                const outputDiv = document.getElementById('output');
+                outputDiv.innerHTML = ''; // Clear previous content
+
+                if (data.results && data.results.length > 0) {
+                    data.results.forEach(result => {
+                        const resultDiv = document.createElement('div');
+                        if (result.key) {
+                            resultDiv.innerHTML = `
+                                <span style="color: green;">${result.key}</span> 
+                                <span style="color: red;">${result.value1}</span>, 
+                                ${result.value2}
+                            `;
+                        } else {
+                            resultDiv.textContent = result.value2;
+                        }
+                        outputDiv.appendChild(resultDiv);
+                    });
                 } else {
-                    document.getElementById('output').innerText = 'Поиск не дал результатов';
+                    outputDiv.textContent = 'Поиск не дал результатов';
                 }
             })
             .catch(error => {
                 console.error('Error:', error);
-                document.getElementById('output').innerText = 'Произошла ошибка при поиске';
+                document.getElementById('output').textContent = 'Произошла ошибка при поиске';
             });
         }
+        window.addEventListener('load', adjustClearButtonHeight);
         function addInput() {
             if (inputCount < 4) {
                 inputCount++;
@@ -344,20 +376,54 @@
                         <button class="removeBtn" onclick="removeInput(this)">×</button>
                     </div>
                 `;
-                document.getElementById('dynamicInputs').appendChild(newInput);
+                
+                // Находим элемент, перед которым нужно вставить новый input
+                const dynamicInputs = document.getElementById('dynamicInputs');
+                const addBtn = document.getElementById('addBtn');
+                
+                // Вставляем новый input перед кнопкой "Добавить поле"
+                dynamicInputs.insertBefore(newInput, addBtn);
+                
                 setupAutocomplete(newInput.querySelector('.searchInput'));
             }
+            adjustClearButtonHeight();
+        }
+        function handleFirstRemove() {
+            const firstInput = document.getElementById('firstInput');
+            if (firstInput) {
+                firstInput.value = ''; // Очищаем текст в первом input
+            }
+        }
+
+        function adjustClearButtonHeight() {
+            const dynamicInputs = document.getElementById('dynamicInputs');
+            const clearAllBtn = document.getElementById('clearAllBtn');
+            const inputContainers = dynamicInputs.querySelectorAll('.input-container');
+            const totalHeight = Array.from(inputContainers).reduce((sum, container) => sum + container.offsetHeight, 0);
+            clearAllBtn.style.height = `${totalHeight}px`;
         }
 
         function removeInput(button) {
             if (inputCount > 1) {
-                // Находим родительский элемент .input-container
-                const inputContainer = button.closest('.input-container');
-                // Удаляем весь контейнер
-                inputContainer.remove();
-                inputCount--;
-                updateAutocomplete();
+                // Проверяем, не является ли это первой кнопкой удаления
+                if (button.id !== 'firstRemoveBtn') {
+                    // Находим родительский элемент .input-container
+                    const inputContainer = button.closest('.input-container');
+                    // Удаляем весь контейнер
+                    inputContainer.remove();
+                    inputCount--;
+                    updateAutocomplete();
+                }
             }
+            adjustClearButtonHeight();
+        }
+
+        function clearAllInputs() {
+            const inputs = document.querySelectorAll('#dynamicInputs .searchInput');
+            inputs.forEach(input => {
+                input.value = '';
+            });
+            // Не вызываем adjustClearButtonHeight() здесь, так как высота не изменяется
         }
 
         function getCookie(name) {
@@ -385,7 +451,6 @@
                 updateAutocomplete();
             });
         };
-        // Пока что все работает Часть2
     </script>
 </body>
 </html>
