@@ -7,6 +7,7 @@
     <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
     <script src="https://code.jquery.com/ui/1.12.1/jquery-ui.min.js"></script>
 </head>
+<!--Пока, что все работает-->
 <style>
     body {
         font-family: Roboto, bold;
@@ -127,6 +128,7 @@
         width: 50vw;
         padding: 0 1.25rem;
         border: 1px solid #ccc;
+        min-height: 100px;
         word-wrap: break-word;
         overflow-wrap: break-word;
     }
@@ -208,6 +210,17 @@
 <body>
     <div class="parent_div">
         <div class="children_div">
+            <div class="floor-selection">
+                <label>Выберите этаж:</label>
+                <select id="floorSelect" onchange="setFloor()">
+                    <option value="1">Этаж 1</option>
+                    <option value="2">Этаж 2</option>
+                </select>
+            </div>
+            <div>
+                <input type="checkbox" id="showImagesCheckbox">
+                <label for="showImagesCheckbox">Показать изображения</label>
+            </div>
             <h2>Поиск по словарю</h2>
             <div id="dynamicInputs">
                 <div class="input-container autocomplete">
@@ -224,6 +237,11 @@
             <div id="additional"></div>
             <h3>Результат</h3>
             <div id="output" contenteditable="true" style="color: blue;"></div>
+            <div id="slider-container" style="display: none;">
+                <div id="slider"></div>
+                <button id="prev">Предыдущее</button>
+                <button id="next">Следующее</button>
+            </div>
         </div>
     </div>
     <script>
@@ -232,22 +250,44 @@
         let inputCount = 1;
         let allItems = [];
 
+        document.addEventListener('DOMContentLoaded', function() {
+            updateAutocomplete();
+        });
+
+        function setFloor() {
+            const floor = document.getElementById('floorSelect').value;
+            fetch('/set_floor/', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRFToken': getCookie('csrftoken')
+                },
+                body: JSON.stringify({ floor: parseInt(floor) })
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    console.log('Floor set successfully');
+                    document.getElementById('output').innerHTML = '';
+                    updateAutocomplete(); // Обновляем автокомплит после смены этажа
+                } else {
+                    console.error('Error setting floor:', data.error);
+                }
+            })
+            .catch(error => console.error('Error:', error));
+        }
+
         function updateAutocomplete() {
-            fetch('/get_keys/')
-                .then(response => response.json())
-                .then(data => {
-                    const keys = data.keys;
-                    fetch('/get_values/')
-                        .then(response => response.json())
-                        .then(data => {
-                            const values = data.values;
-                            allItems = [...new Set([...keys, ...values])];
-                            const inputs = document.getElementsByClassName('searchInput');
-                            Array.from(inputs).forEach(input => {
-                                setupAutocomplete(input);
-                            });
-                        });
+            Promise.all([
+                fetch('/get_keys/').then(response => response.json()),
+                fetch('/get_values/').then(response => response.json())
+            ]).then(([keysData, valuesData]) => {
+                allItems = [...new Set([...keysData.keys, ...valuesData.values])];
+                const inputs = document.getElementsByClassName('searchInput');
+                Array.from(inputs).forEach(input => {
+                    setupAutocomplete(input);
                 });
+            });
         }
 
         function setupAutocomplete(inp) {
@@ -324,6 +364,7 @@
         function performSearch() {
             const inputs = document.getElementsByClassName('searchInput');
             const searchValues = Array.from(inputs).map(input => input.value).filter(value => value.trim() !== '');
+            const showImages = document.getElementById('showImagesCheckbox').checked;
 
             fetch('/search/', {
                 method: 'POST',
@@ -338,7 +379,7 @@
             .then(response => response.json())
             .then(data => {
                 const outputDiv = document.getElementById('output');
-                outputDiv.innerHTML = ''; // Clear previous content
+                outputDiv.innerHTML = '';
 
                 if (data.results && data.results.length > 0) {
                     data.results.forEach(result => {
@@ -354,6 +395,12 @@
                         }
                         outputDiv.appendChild(resultDiv);
                     });
+
+                    if (showImages) {
+                        createSlider(data.results);
+                    } else {
+                        document.getElementById('slider-container').style.display = 'none';
+                    }
                 } else {
                     outputDiv.textContent = 'Поиск не дал результатов';
                 }
@@ -362,6 +409,70 @@
                 console.error('Error:', error);
                 document.getElementById('output').textContent = 'Произошла ошибка при поиске';
             });
+        }
+
+        function createSlider(results) {
+            const sliderContainer = document.getElementById('slider-container');
+            const slider = document.getElementById('slider');
+            slider.innerHTML = '';
+
+            const validResults = results.filter(result => result.image_query);
+
+            if (validResults.length > 0) {
+                sliderContainer.style.display = 'block';
+                validResults.forEach((result, index) => {
+                    fetchImage(result.image_query).then(imageUrl => {
+                        const img = document.createElement('img');
+                        img.src = imageUrl;
+                        img.style.display = index === 0 ? 'block' : 'none';
+                        slider.appendChild(img);
+                    });
+                });
+
+                let currentSlide = 0;
+                const prevButton = document.getElementById('prev');
+                const nextButton = document.getElementById('next');
+
+                prevButton.onclick = () => {
+                    currentSlide = (currentSlide - 1 + validResults.length) % validResults.length;
+                    updateSlider();
+                };
+
+                nextButton.onclick = () => {
+                    currentSlide = (currentSlide + 1) % validResults.length;
+                    updateSlider();
+                };
+
+                function updateSlider() {
+                    const images = slider.getElementsByTagName('img');
+                    for (let i = 0; i < images.length; i++) {
+                        images[i].style.display = i === currentSlide ? 'block' : 'none';
+                    }
+                }
+            } else {
+                sliderContainer.style.display = 'none';
+            }
+        }
+        async function fetchImage(query) {
+            try {
+                const response = await fetch('/search_image/', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({ query: query })
+                });
+                const data = await response.json();
+                if (data.image_url) {
+                    return data.image_url;
+                } else {
+                    console.error('Error fetching image:', data.error);
+                    return 'https://via.placeholder.com/300x200?text=Image+Not+Found';
+                }
+            } catch (error) {
+                console.error('Error fetching image:', error);
+                return 'https://via.placeholder.com/300x200?text=Error+Fetching+Image';
+            }
         }
         window.addEventListener('load', adjustClearButtonHeight);
         function addInput() {
@@ -440,16 +551,16 @@
             return cookieValue;
         }
 
-        window.onload = function() {
-            Promise.all([
-                fetch('/get_keys/').then(response => response.json()),
-                fetch('/get_values/').then(response => response.json())
-            ]).then(([keysData, valuesData]) => {
-                allKeys = keysData.keys;
-                allValues = valuesData.values;
-                updateAutocomplete();
-            });
-        };
+        // window.onload = function() {
+        //     Promise.all([
+        //         fetch('/get_keys/').then(response => response.json()),
+        //         fetch('/get_values/').then(response => response.json())
+        //     ]).then(([keysData, valuesData]) => {
+        //         allKeys = keysData.keys;
+        //         allValues = valuesData.values;
+        //         updateAutocomplete();
+        //     });
+        // };
     </script>
 </body>
 </html>
