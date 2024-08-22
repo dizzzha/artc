@@ -4,7 +4,6 @@ from django.views.decorators.csrf import csrf_exempt
 import json
 from .output_dict import dictionary
 from .output_dict2 import dictionary
-import requests
 from bs4 import BeautifulSoup
 
 
