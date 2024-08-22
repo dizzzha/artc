@@ -7,4 +7,6 @@ urlpatterns = [
     path('get_keys/', views.get_keys, name='get_keys'),
     path('get_values/', views.get_values, name='get_values'),
     path('search/', views.search, name='search'),
+    path('search_image/', views.search_image, name='search_image'),
+    path('set_floor/', views.set_floor, name='set_floor'),
 ]
