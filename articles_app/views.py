@@ -93,6 +93,40 @@ def search(request):
 
     return JsonResponse({'error': 'Метод не разрешен'}, status=405)
 
+@csrf_exempt
+def search_image(request):
+    if request.method == 'POST':
+        data = json.loads(request.body)
+        query = data.get('query', '')
+
+        # Формируем URL для поиска на Яндекс.Картинках
+        # url = f"https://yandex.ru/images/search?text={requests.utils.quote(query)}"
+
+        headers = {
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
+        }
+
+        try:
+            # response = requests.get(url, headers=headers)
+            # soup = BeautifulSoup(response.text, 'html.parser')
+            # 
+            # # Ищем первое изображение
+            # img = soup.select_one('img.serp-item__thumb')
+            if True:
+                return True
+            
+            # if img and 'src' in img.attrs:
+            #     image_url = img['src']
+            #     if not image_url.startswith('http'):
+            #         image_url = 'https:' + image_url
+            #     return JsonResponse({'image_url': image_url})
+            # else:
+            #     return JsonResponse({'error': 'Image not found'}, status=404)
+
+        except Exception as e:
+            return JsonResponse({'error': str(e)}, status=500)
+
+    return JsonResponse({'error': 'Invalid request method'}, status=405)
 
 @csrf_exempt
 def set_floor(request):
