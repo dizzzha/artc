@@ -68,6 +68,8 @@ TEMPLATES = [
     },
 ]
 
+SESSION_ENGINE = "django.contrib.sessions.backends.cache"
+
 WSGI_APPLICATION = 'articles_django.wsgi.application'
 
 
