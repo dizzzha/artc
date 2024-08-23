@@ -1,10 +1,8 @@
 <!DOCTYPE html>
-{% load static %}
 <html>
 <head>
-    <title>Словарь</title>
+    <title>Словарь 3 этаж</title>
     <meta name="viewport" content="width=device-width, user-scalable=no">
-    <link rel="shortcut icon" href="{% static 'favicon.ico' %}" type="image/x-icon">
     <link rel="stylesheet" href="https://code.jquery.com/ui/1.12.1/themes/base/jquery-ui.css">
     <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
     <script src="https://code.jquery.com/ui/1.12.1/jquery-ui.min.js"></script>
@@ -129,7 +127,6 @@
         width: 50vw;
         padding: 0 1.25rem;
         border: 1px solid #ccc;
-        min-height: 100px;
         word-wrap: break-word;
         overflow-wrap: break-word;
     }
@@ -211,18 +208,8 @@
 <body>
     <div class="parent_div">
         <div class="children_div">
-            <div class="floor-selection">
-                <label>Выберите этаж:</label>
-                <select id="floorSelect" onchange="setFloor()">
-                    <option value="1">Этаж 3</option>
-                    <option value="2">Этаж 2</option>
-                </select>
-            </div>
-            <div>
-                <input type="checkbox" id="showImagesCheckbox">
-                <label for="showImagesCheckbox">Показать изображения</label>
-            </div>
-            <h2>Поиск по словарю</h2>
+            <h2>Поиск по словарю 3 Этажа</h2>
+            <a href="second_floor">Словарь 2-го этажа</a>
             <div id="dynamicInputs">
                 <div class="input-container autocomplete">
                     <div class="input-wrapper">
@@ -238,11 +225,6 @@
             <div id="additional"></div>
             <h3>Результат</h3>
             <div id="output" contenteditable="true" style="color: blue;"></div>
-            <div id="slider-container" style="display: none;">
-                <div id="slider"></div>
-                <button id="prev">Предыдущее</button>
-                <button id="next">Следующее</button>
-            </div>
         </div>
     </div>
     <script>
@@ -251,54 +233,22 @@
         let inputCount = 1;
         let allItems = [];
 
-        document.addEventListener('DOMContentLoaded', function() {
-            updateAutocomplete();
-        });
-
-        function setFloor() {
-            const floor = document.getElementById('floorSelect').value;
-            fetch('/set_floor/', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'X-CSRFToken': getCookie('csrftoken')
-                },
-                body: JSON.stringify({ floor: parseInt(floor) })
-            })
-            .then(response => {
-                if (!response.ok) {
-                    return response.text().then(text => {
-                        throw new Error(`HTTP error! status: ${response.status}, body: ${text}`);
-                    });
-                }
-                return response.json();
-            })
-            .then(data => {
-                if (data.success) {
-                    console.log('Floor set successfully');
-                    document.getElementById('output').innerHTML = '';
-                    updateAutocomplete();
-                } else {
-                    console.error('Error setting floor:', data.error);
-                }
-            })
-            .catch(error => {
-                console.error('Error:', error);
-                // Отобразите ошибку пользователю
-            });
-        }
-
         function updateAutocomplete() {
-            Promise.all([
-                fetch('/get_keys/').then(response => response.json()),
-                fetch('/get_values/').then(response => response.json())
-            ]).then(([keysData, valuesData]) => {
-                allItems = [...new Set([...keysData.keys, ...valuesData.values])];
-                const inputs = document.getElementsByClassName('searchInput');
-                Array.from(inputs).forEach(input => {
-                    setupAutocomplete(input);
+            fetch('/get_keys/')
+                .then(response => response.json())
+                .then(data => {
+                    const keys = data.keys;
+                    fetch('/get_values/')
+                        .then(response => response.json())
+                        .then(data => {
+                            const values = data.values;
+                            allItems = [...new Set([...keys, ...values])];
+                            const inputs = document.getElementsByClassName('searchInput');
+                            Array.from(inputs).forEach(input => {
+                                setupAutocomplete(input);
+                            });
+                        });
                 });
-            });
         }
 
         function setupAutocomplete(inp) {
@@ -375,7 +325,6 @@
         function performSearch() {
             const inputs = document.getElementsByClassName('searchInput');
             const searchValues = Array.from(inputs).map(input => input.value).filter(value => value.trim() !== '');
-            const showImages = document.getElementById('showImagesCheckbox').checked;
 
             fetch('/search/', {
                 method: 'POST',
@@ -390,15 +339,15 @@
             .then(response => response.json())
             .then(data => {
                 const outputDiv = document.getElementById('output');
-                outputDiv.innerHTML = '';
+                outputDiv.innerHTML = ''; // Clear previous content
 
                 if (data.results && data.results.length > 0) {
                     data.results.forEach(result => {
                         const resultDiv = document.createElement('div');
                         if (result.key) {
                             resultDiv.innerHTML = `
-                                <span style="color: green;">${result.key}</span> 
-                                <span style="color: red;">${result.value1}</span>, 
+                                <span style="color: green;">${result.key}</span>
+                                <span style="color: red;">${result.value1}</span>,
                                 ${result.value2}
                             `;
                         } else {
@@ -406,12 +355,6 @@
                         }
                         outputDiv.appendChild(resultDiv);
                     });
-
-                    if (showImages) {
-                        createSlider(data.results);
-                    } else {
-                        document.getElementById('slider-container').style.display = 'none';
-                    }
                 } else {
                     outputDiv.textContent = 'Поиск не дал результатов';
                 }
@@ -420,70 +363,6 @@
                 console.error('Error:', error);
                 document.getElementById('output').textContent = 'Произошла ошибка при поиске';
             });
-        }
-
-        function createSlider(results) {
-            const sliderContainer = document.getElementById('slider-container');
-            const slider = document.getElementById('slider');
-            slider.innerHTML = '';
-
-            const validResults = results.filter(result => result.image_query);
-
-            if (validResults.length > 0) {
-                sliderContainer.style.display = 'block';
-                validResults.forEach((result, index) => {
-                    fetchImage(result.image_query).then(imageUrl => {
-                        const img = document.createElement('img');
-                        img.src = imageUrl;
-                        img.style.display = index === 0 ? 'block' : 'none';
-                        slider.appendChild(img);
-                    });
-                });
-
-                let currentSlide = 0;
-                const prevButton = document.getElementById('prev');
-                const nextButton = document.getElementById('next');
-
-                prevButton.onclick = () => {
-                    currentSlide = (currentSlide - 1 + validResults.length) % validResults.length;
-                    updateSlider();
-                };
-
-                nextButton.onclick = () => {
-                    currentSlide = (currentSlide + 1) % validResults.length;
-                    updateSlider();
-                };
-
-                function updateSlider() {
-                    const images = slider.getElementsByTagName('img');
-                    for (let i = 0; i < images.length; i++) {
-                        images[i].style.display = i === currentSlide ? 'block' : 'none';
-                    }
-                }
-            } else {
-                sliderContainer.style.display = 'none';
-            }
-        }
-        async function fetchImage(query) {
-            try {
-                const response = await fetch('/search_image/', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                    },
-                    body: JSON.stringify({ query: query })
-                });
-                const data = await response.json();
-                if (data.image_url) {
-                    return data.image_url;
-                } else {
-                    console.error('Error fetching image:', data.error);
-                    return 'https://via.placeholder.com/300x200?text=Image+Not+Found';
-                }
-            } catch (error) {
-                console.error('Error fetching image:', error);
-                return 'https://via.placeholder.com/300x200?text=Error+Fetching+Image';
-            }
         }
         window.addEventListener('load', adjustClearButtonHeight);
         function addInput() {
@@ -497,14 +376,14 @@
                         <button class="removeBtn" onclick="removeInput(this)">×</button>
                     </div>
                 `;
-                
+
                 // Находим элемент, перед которым нужно вставить новый input
                 const dynamicInputs = document.getElementById('dynamicInputs');
                 const addBtn = document.getElementById('addBtn');
-                
+
                 // Вставляем новый input перед кнопкой "Добавить поле"
                 dynamicInputs.insertBefore(newInput, addBtn);
-                
+
                 setupAutocomplete(newInput.querySelector('.searchInput'));
             }
             adjustClearButtonHeight();
@@ -562,16 +441,16 @@
             return cookieValue;
         }
 
-        // window.onload = function() {
-        //     Promise.all([
-        //         fetch('/get_keys/').then(response => response.json()),
-        //         fetch('/get_values/').then(response => response.json())
-        //     ]).then(([keysData, valuesData]) => {
-        //         allKeys = keysData.keys;
-        //         allValues = valuesData.values;
-        //         updateAutocomplete();
-        //     });
-        // };
+        window.onload = function() {
+            Promise.all([
+                fetch('/get_keys/').then(response => response.json()),
+                fetch('/get_values/').then(response => response.json())
+            ]).then(([keysData, valuesData]) => {
+                allKeys = keysData.keys;
+                allValues = valuesData.values;
+                updateAutocomplete();
+            });
+        };
     </script>
 </body>
 </html>
