@@ -146,7 +146,10 @@ def set_floor(request):
         except json.JSONDecodeError:
             return JsonResponse({'error': 'Invalid JSON'}, status=400)
         except Exception as e:
-            return JsonResponse({'error': str(e)}, status=500)
+            import traceback
+            error_message = f"An error occurred: {str(e)}\n{traceback.format_exc()}"
+            print(error_message)  # This will be logged in Vercel
+            return JsonResponse({'error': error_message}, status=500)
     return JsonResponse({'error': 'Invalid request method'}, status=405)
 
 #VALUE
