@@ -131,19 +131,22 @@ def search_image(request):
 @csrf_exempt
 def set_floor(request):
     if request.method == 'POST':
-        data = json.loads(request.body)
-        floor = data.get('floor')
+        try:
+            data = json.loads(request.body)
+            floor = data.get('floor')
 
-        if floor == 1:
-            from .output_dict import dictionary as floor_1_dict
-            request.session['current_dict'] = 'floor_1_dict'
-        elif floor == 2:
-            from .output_dict2 import dictionary as floor_2_dict
-            request.session['current_dict'] = 'floor_2_dict'
-        else:
-            return JsonResponse({'error': 'Invalid floor'}, status=400)
+            if floor == 1:
+                request.session['current_dict'] = 'floor_1_dict'
+            elif floor == 2:
+                request.session['current_dict'] = 'floor_2_dict'
+            else:
+                return JsonResponse({'error': 'Invalid floor'}, status=400)
 
-        return JsonResponse({'success': True})
+            return JsonResponse({'success': True})
+        except json.JSONDecodeError:
+            return JsonResponse({'error': 'Invalid JSON'}, status=400)
+        except Exception as e:
+            return JsonResponse({'error': str(e)}, status=500)
     return JsonResponse({'error': 'Invalid request method'}, status=405)
 
 #VALUE
