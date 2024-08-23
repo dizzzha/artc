@@ -265,17 +265,27 @@
                 },
                 body: JSON.stringify({ floor: parseInt(floor) })
             })
-            .then(response => response.json())
+            .then(response => {
+                if (!response.ok) {
+                    return response.text().then(text => {
+                        throw new Error(`HTTP error! status: ${response.status}, body: ${text}`);
+                    });
+                }
+                return response.json();
+            })
             .then(data => {
                 if (data.success) {
                     console.log('Floor set successfully');
                     document.getElementById('output').innerHTML = '';
-                    updateAutocomplete(); // Обновляем автокомплит после смены этажа
+                    updateAutocomplete();
                 } else {
                     console.error('Error setting floor:', data.error);
                 }
             })
-            .catch(error => console.error('Error:', error));
+            .catch(error => {
+                console.error('Error:', error);
+                // Отобразите ошибку пользователю
+            });
         }
 
         function updateAutocomplete() {
