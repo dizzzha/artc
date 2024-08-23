@@ -50,6 +50,7 @@ MIDDLEWARE = [
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
 ]
 
+SESSION_ENGINE = "django.contrib.sessions.backends.cache"
 ROOT_URLCONF = 'articles_django.urls'
 
 TEMPLATES = [
