@@ -3,11 +3,15 @@ from django.http import JsonResponse
 from django.views.decorators.csrf import csrf_exempt
 import json
 from .output_dict import dictionary
-from .output_dict2 import dictionary
+from .output_dict2 import dictionary as dict2
 
 
 def index(request):
     return render(request, 'index.html')
+
+
+def second_floor(request):
+    return render(request, 'second_floor.html')
 
 
 def get_value_for_key(key):
@@ -21,25 +25,23 @@ def get_value(request):
         return JsonResponse({'values': values})
 
 
-@csrf_exempt
 def get_keys(request):
-    current_dict = request.session.get('current_dict', 'floor_1_dict')
-    if current_dict == 'floor_1_dict':
-        from .output_dict import dictionary
-    else:
-        from .output_dict2 import dictionary
     keys = list(dictionary.keys())
     return JsonResponse({'keys': keys})
 
 
-@csrf_exempt
 def get_values(request):
-    current_dict = request.session.get('current_dict', 'floor_1_dict')
-    if current_dict == 'floor_1_dict':
-        from .output_dict import dictionary
-    else:
-        from .output_dict2 import dictionary
     values = [value[1] for value in dictionary.values()]
+    return JsonResponse({'values': values})
+
+
+def get_keys2(request):
+    keys = list(dict2.keys())
+    return JsonResponse({'keys': keys})
+
+
+def get_values2(request):
+    values = [value[1] for value in dict2.values()]
     return JsonResponse({'values': values})
 
 
@@ -48,13 +50,6 @@ def search(request):
     if request.method == 'POST':
         data = json.loads(request.body)
         search_values = data.get('search_values', [])
-
-        # Выбор словаря в зависимости от выбранного этажа
-        current_dict = request.session.get('current_dict', 'floor_1_dict')
-        if current_dict == 'floor_1_dict':
-            from .output_dict import dictionary
-        else:
-            from .output_dict2 import dictionary
 
         results = []
         for search_value in search_values:
@@ -70,87 +65,66 @@ def search(request):
                 results.append({
                     'key': search_value,
                     'value1': key_result[0],
-                    'value2': key_result[1],
-                    'image_query': key_result[1]  # Используем второй элемент как запрос для изображения
+                    'value2': key_result[1]
                 })
             elif value_results:
                 for key, value in value_results:
                     results.append({
                         'key': key,
                         'value1': value[0],
-                        'value2': value[1],
-                        'image_query': value[1]  # Используем второй элемент как запрос для изображения
+                        'value2': value[1]
                     })
             else:
                 results.append({
                     'key': None,
                     'value1': None,
-                    'value2': f"Ничего не найдено для запроса: {search_value}",
-                    'image_query': None
+                    'value2': f"Ничего не найдено для запроса: {search_value}"
                 })
 
         return JsonResponse({'results': results})
 
     return JsonResponse({'error': 'Метод не разрешен'}, status=405)
 
+
 @csrf_exempt
-def search_image(request):
+def search2(request):
     if request.method == 'POST':
         data = json.loads(request.body)
-        query = data.get('query', '')
+        search_values = data.get('search_values', [])
 
-        # Формируем URL для поиска на Яндекс.Картинках
-        # url = f"https://yandex.ru/images/search?text={requests.utils.quote(query)}"
+        results2 = []
+        for search_value2 in search_values:
+            key_result2 = dict2.get(search_value2) or dict2.get(search_value2.upper()) or dict2.get(
+                search_value2.lower())
 
-        headers = {
-            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
-        }
+            value_results2 = [
+                (key, value) for key, value in dict2.items()
+                if search_value2.lower() == value[1].lower()
+            ]
 
-        try:
-            # response = requests.get(url, headers=headers)
-            # soup = BeautifulSoup(response.text, 'html.parser')
-            # 
-            # # Ищем первое изображение
-            # img = soup.select_one('img.serp-item__thumb')
-            if True:
-                return True
-            
-            # if img and 'src' in img.attrs:
-            #     image_url = img['src']
-            #     if not image_url.startswith('http'):
-            #         image_url = 'https:' + image_url
-            #     return JsonResponse({'image_url': image_url})
-            # else:
-            #     return JsonResponse({'error': 'Image not found'}, status=404)
-
-        except Exception as e:
-            return JsonResponse({'error': str(e)}, status=500)
-
-    return JsonResponse({'error': 'Invalid request method'}, status=405)
-
-@csrf_exempt
-def set_floor(request):
-    if request.method == 'POST':
-        try:
-            data = json.loads(request.body)
-            floor = data.get('floor')
-
-            if floor == 1:
-                request.session['current_dict'] = 'floor_1_dict'
-            elif floor == 2:
-                request.session['current_dict'] = 'floor_2_dict'
+            if key_result2:
+                results2.append({
+                    'key': search_value2,
+                    'value1': key_result2[0],
+                    'value2': key_result2[1]
+                })
+            elif value_results2:
+                for key, value in value_results2:
+                    results2.append({
+                        'key': key,
+                        'value1': value[0],
+                        'value2': value[1]
+                    })
             else:
-                return JsonResponse({'error': 'Invalid floor'}, status=400)
+                results2.append({
+                    'key': None,
+                    'value1': None,
+                    'value2': f"Ничего не найдено для запроса: {search_value2}"
+                })
 
-            return JsonResponse({'success': True})
-        except json.JSONDecodeError:
-            return JsonResponse({'error': 'Invalid JSON'}, status=400)
-        except Exception as e:
-            import traceback
-            error_message = f"An error occurred: {str(e)}\n{traceback.format_exc()}"
-            print(error_message)  # This will be logged in Vercel
-            return JsonResponse({'error': error_message}, status=500)
-    return JsonResponse({'error': 'Invalid request method'}, status=405)
+        return JsonResponse({'results': results2})
+
+    return JsonResponse({'error': 'Метод не разрешен'}, status=405)
 
 #VALUE
 #def get_articles
